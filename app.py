@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 import os
+import requests  # ← ADDED THIS
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -41,8 +42,10 @@ def webhook_omi():
         print(f"\n📥 WEBHOOK RECEIVED:")
         print(f"Data: {data}")
         
-        # Extract key info
+        # Extract transcript from Omi's format
         transcript = ''
+        
+        # Try different possible transcript formats
         if 'transcript' in data:
             transcript = data.get('transcript', '')
         elif 'transcript_segments' in data:
@@ -57,7 +60,6 @@ def webhook_omi():
         timestamp = data.get('created_at') or data.get('timestamp') or datetime.now().isoformat()
         
         print(f"📝 Extracted transcript: {transcript}")
-        timestamp = data.get('timestamp', datetime.now().isoformat())
         
         # Process the transcript
         result = process_conversation(transcript, timestamp)
@@ -85,6 +87,9 @@ def daily_report():
         report = generate_daily_report()
         print(f"\n📊 REPORT GENERATED:")
         print(report)
+        
+        # Send report to Slack
+        send_daily_report_to_slack(report)
         
         return jsonify(report)
     
@@ -163,12 +168,25 @@ def save_interruption(transcript, timestamp, int_type):
 
 
 def activate_focus_mode():
-    """Activate focus mode"""
+    """Activate focus mode and notify Slack"""
     user_state['focus_mode_active'] = True
     user_state['focus_start_time'] = datetime.now().isoformat()
     
     print("🔴 FOCUS MODE ACTIVATED")
-    # TODO: Send Slack notification (Person 2 will provide webhook)
+    
+    # Send Slack notification
+    send_slack_notification({
+        'text': '🔴 Focus Mode Activated',
+        'blocks': [
+            {
+                'type': 'section',
+                'text': {
+                    'type': 'mrkdwn',
+                    'text': '*Focus Mode Active* 🎯\n\nYou are in deep work mode for the next 90 minutes.\nPlease hold non-urgent messages.'
+                }
+            }
+        ]
+    })
 
 
 def generate_daily_report():
@@ -194,6 +212,55 @@ def generate_daily_report():
     return report
 
 
+def send_daily_report_to_slack(report):
+    """Send daily report to Slack"""
+    # Format interruptions by type
+    by_type_text = '\n'.join([f'• {k}: {v}' for k, v in report.get('interruptions_by_type', {}).items()])
+    if not by_type_text:
+        by_type_text = '• None'
+    
+    send_slack_notification({
+        'text': '📊 Daily Focus Report',
+        'blocks': [
+            {
+                'type': 'header',
+                'text': {
+                    'type': 'plain_text',
+                    'text': '📊 Your Daily Focus Report'
+                }
+            },
+            {
+                'type': 'section',
+                'fields': [
+                    {
+                        'type': 'mrkdwn',
+                        'text': f"*Total Interruptions:*\n{report['total_interruptions']}"
+                    },
+                    {
+                        'type': 'mrkdwn',
+                        'text': f"*Time Lost:*\n{report['hours_lost']} hours"
+                    },
+                    {
+                        'type': 'mrkdwn',
+                        'text': f"*Focus Score:*\n{report['focus_score']}/10"
+                    },
+                    {
+                        'type': 'mrkdwn',
+                        'text': f"*By Type:*\n{by_type_text}"
+                    }
+                ]
+            },
+            {
+                'type': 'section',
+                'text': {
+                    'type': 'mrkdwn',
+                    'text': f"💡 *Tip:* {report['tip']}"
+                }
+            }
+        ]
+    })
+
+
 def get_tip(count):
     """Generate personalized tip"""
     if count > 15:
@@ -202,6 +269,25 @@ def get_tip(count):
         return "Great focus day! Keep it up."
     else:
         return "Moderate interruptions. Use focus mode for deep work."
+
+
+def send_slack_notification(payload):
+    """Send notification to Slack"""
+    webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
+    
+    if not webhook_url:
+        print('⚠️ Slack webhook not configured. Skipping notification.')
+        print('Would have sent:', payload)
+        return
+    
+    try:
+        response = requests.post(webhook_url, json=payload)
+        if response.status_code == 200:
+            print('✅ Slack notification sent successfully')
+        else:
+            print(f'❌ Slack error: {response.status_code} - {response.text}')
+    except Exception as e:
+        print(f'❌ Error sending Slack notification: {e}')
 
 
 # ============================================
