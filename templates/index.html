@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Switch Guardian - Live Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-card .label {
+            color: #999;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .status {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .status-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.active {
+            background: #10b981;
+        }
+        
+        .status-dot.focus {
+            background: #ef4444;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .activity-log {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .activity-log h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .log-entry {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .log-entry.interruption {
+            border-left-color: #f59e0b;
+        }
+        
+        .log-entry.focus {
+            border-left-color: #ef4444;
+        }
+        
+        .log-time {
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .log-message {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .refresh-notice {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .demo-notice {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .demo-notice strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Context Switch Guardian</h1>
+            <p>Live Demo Dashboard</p>
+        </div>
+        
+        <div class="demo-notice">
+            <strong>🎬 Live Demo</strong>
+            This page auto-refreshes every 10 seconds to show real-time activity
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Interruptions</h3>
+                <div class="value" id="total-interruptions">--</div>
+                <div class="label">Today</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Time Lost</h3>
+                <div class="value" id="hours-lost">--</div>
+                <div class="label">Hours</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Focus Score</h3>
+                <div class="value" id="focus-score">--</div>
+                <div class="label">Out of 10</div>
+            </div>
+        </div>
+        
+        <div class="status">
+            <h2>System Status</h2>
+            <div class="status-indicator">
+                <div class="status-dot active"></div>
+                <div>
+                    <strong>System Active</strong>
+                    <div style="color: #666; font-size: 14px;">Monitoring conversations in real-time</div>
+                </div>
+            </div>
+            
+            <div class="status-indicator" style="margin-top: 15px;" id="focus-status">
+                <div class="status-dot" id="focus-dot"></div>
+                <div>
+                    <strong id="focus-text">Focus Mode: Inactive</strong>
+                    <div style="color: #666; font-size: 14px;" id="focus-desc">Ready to activate</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="activity-log">
+            <h2>Recent Activity</h2>
+            <div id="activity-container">
+                <div class="log-entry">
+                    <div class="log-time">System initialized</div>
+                    <div class="log-message">Waiting for activity...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="refresh-notice">
+            🔄 Page refreshes automatically every 10 seconds
+        </div>
+    </div>
+    
+    <script>
+        async function updateDashboard() {
+            try {
+                // Fetch data from API
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+                
+                // Update stats
+                document.getElementById('total-interruptions').textContent = data.total_interruptions;
+                document.getElementById('hours-lost').textContent = data.hours_lost;
+                document.getElementById('focus-score').textContent = data.focus_score;
+                
+                // Update focus status
+                const focusDot = document.getElementById('focus-dot');
+                const focusText = document.getElementById('focus-text');
+                const focusDesc = document.getElementById('focus-desc');
+                
+                if (data.focus_mode_active) {
+                    focusDot.classList.add('focus');
+                    focusText.textContent = 'Focus Mode: ACTIVE';
+                    focusDesc.textContent = 'Deep work mode enabled';
+                } else {
+                    focusDot.classList.remove('focus');
+                    focusText.textContent = 'Focus Mode: Inactive';
+                    focusDesc.textContent = 'Ready to activate';
+                }
+                
+                // Update activity log
+                const activityContainer = document.getElementById('activity-container');
+                if (data.recent_activity && data.recent_activity.length > 0) {
+                    activityContainer.innerHTML = data.recent_activity.map(activity => {
+                        const time = new Date(activity.timestamp).toLocaleTimeString();
+                        return `
+                            <div class="log-entry ${activity.type}">
+                                <div class="log-time">${time}</div>
+                                <div class="log-message">${activity.message}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Error updating dashboard:', error);
+            }
+        }
+        
+        // Update immediately on load
+        updateDashboard();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(updateDashboard, 10000);
+    </script>
+</body>
+</html>

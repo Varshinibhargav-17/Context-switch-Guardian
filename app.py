@@ -289,6 +289,56 @@ def send_slack_notification(payload):
     except Exception as e:
         print(f'❌ Error sending Slack notification: {e}')
 
+# ============================================
+# DASHBOARD ROUTES
+# ============================================
+
+@app.route('/dashboard')
+def dashboard():
+    """Serve the live dashboard"""
+    from flask import render_template
+    return render_template('index.html')
+
+
+@app.route('/api/dashboard', methods=['GET'])
+def api_dashboard():
+    """API endpoint for dashboard data"""
+    # Calculate stats
+    total_interruptions = len(interruptions)
+    hours_lost = round((total_interruptions * 23) / 60, 1)
+    focus_score = round(max(1, min(10, 10 - total_interruptions / 3)), 1)
+    
+    # Get recent activity (last 10 items)
+    recent_activity = []
+    
+    # Add interruptions to activity
+    for interruption in interruptions[-10:]:
+        recent_activity.append({
+            'timestamp': interruption['timestamp'],
+            'type': 'interruption',
+            'message': f"🔔 Interruption detected: {interruption['type']} - \"{interruption['transcript'][:50]}...\""
+        })
+    
+    # Add focus mode if active
+    if user_state['focus_mode_active']:
+        recent_activity.append({
+            'timestamp': user_state['focus_start_time'],
+            'type': 'focus',
+            'message': '🎯 Focus mode activated for 90 minutes'
+        })
+    
+    # Sort by timestamp (newest first)
+    recent_activity.sort(key=lambda x: x['timestamp'], reverse=True)
+    recent_activity = recent_activity[:10]
+    
+    return jsonify({
+        'total_interruptions': total_interruptions,
+        'hours_lost': hours_lost,
+        'focus_score': focus_score,
+        'focus_mode_active': user_state['focus_mode_active'],
+        'recent_activity': recent_activity
+    }) 
+
 
 # ============================================
 # START SERVER
