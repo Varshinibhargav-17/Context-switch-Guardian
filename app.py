@@ -42,7 +42,21 @@ def webhook_omi():
         print(f"Data: {data}")
         
         # Extract key info
-        transcript = data.get('transcript', '')
+        transcript = ''
+        if 'transcript' in data:
+            transcript = data.get('transcript', '')
+        elif 'transcript_segments' in data:
+            # Omi sends transcript in segments
+            segments = data.get('transcript_segments', [])
+            transcript = ' '.join([seg.get('text', '') for seg in segments])
+        elif 'structured' in data:
+            # Fallback to structured overview
+            transcript = data.get('structured', {}).get('overview', '')
+        
+        # Get timestamp
+        timestamp = data.get('created_at') or data.get('timestamp') or datetime.now().isoformat()
+        
+        print(f"📝 Extracted transcript: {transcript}")
         timestamp = data.get('timestamp', datetime.now().isoformat())
         
         # Process the transcript
